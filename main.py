@@ -1,65 +1,84 @@
 # import maup
 import time
 import geopandas as gpd
-import pandas as pd
-from gerrychain import Graph, Partition, proposals, updaters, constraints, accept, MarkovChain, Election
+from gerrychain import (
+    Graph,
+    Partition,
+    proposals,
+    updaters,
+    constraints,
+    accept,
+    MarkovChain,
+    Election,
+)
 from functools import partial
+import matplotlib.pyplot as plt
+from gerrychain.metrics import mean_median, efficiency_gap
+from tqdm import tqdm
 
 
-# maup.progress.enabled = True
-
+class bcolors:
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKPINK = "\u001b[38;5;201m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
 
 
 # Load the data
+print(f"{bcolors.OKCYAN}🚚 Loading the data...{bcolors.ENDC}")
 start_time = time.time()
 ohio = gpd.read_file("Ohio.shp")
 
 oh_graph = Graph.from_geodataframe(ohio)
 
 
-## print all the columns
-print(ohio.columns)
-
 num_districts = 15
 total_population = sum([oh_graph.nodes()[v]["TOTPOP"] for v in oh_graph.nodes()])
 ideal_population = total_population / num_districts
 population_tolerance = 0.02
 
-# TODO: delete all races other than white and black
-# TODO: add dem/rep votes for pres16 and sen16
-# TODO: see lab 2
-# TODO: efficiency gap analysis - each party in each district, twin bar graphs to show the wasted votes
-# TODO: mean median analysis 
 
-# TODO: short burst and marginal box plots
+# TODO: short burst
 cutedge_ensemble = []
 population_ensemble = []
-districts_won_by_republican_in_pres16 = []
-districts_won_by_republican_in_sen16 = []
+
 districts_won_by_democrat_in_pres16 = []
 districts_won_by_democrat_in_sen16 = []
-maj_hisp_ensemble = []
+
 maj_white_ensemble = []
 maj_black_ensemble = []
-maj_asian_ensemble = []
-maj_native_ensemble = []
 
 # Create an initial partition
+print(f"{bcolors.OKCYAN}🏗️  Creating an initial partition...{bcolors.ENDC}")
 initial_partition = Partition(
     oh_graph,
     assignment="CONG_DIST",
     updaters={
         "populaton": updaters.Tally("TOTPOP", alias="populaton"),
         "cut_edges": updaters.cut_edges,
-        "hisp": updaters.Tally("HISP", alias="hisp"),
         "white": updaters.Tally("NH_WHITE", alias="white"),
         "black": updaters.Tally("NH_BLACK", alias="black"),
-        "asian": updaters.Tally("NH_ASIAN", alias="asian"),
-        "native": updaters.Tally("NH_AMIN", alias="native"),
-    }
+        "dem_won_pres": Election(
+            "2016 presidential",
+            {"Dem": "PRES16D", "Rep": "PRES16R"},
+            alias="dem_won_pres",
+        ),
+        "dem_won_sen": Election(
+            "2016 senatorial",
+            {"Dem": "USS16D", "Rep": "USS16R"},
+            alias="dem_won_sen",
+        ),
+    },
 )
 
 # Create an initial proposal
+print(f"{bcolors.OKCYAN}📜 Creating an initial proposal...{bcolors.ENDC}")
 proposal = partial(
     proposals.recom,
     pop_col="TOTPOP",
@@ -69,9 +88,13 @@ proposal = partial(
 )
 
 # Create a constraint
-population_constraint = constraints.within_percent_of_ideal_population(initial_partition, population_tolerance, pop_key="populaton")
+print(f"{bcolors.OKCYAN}🔒 Creating a population constraint...{bcolors.ENDC}")
+population_constraint = constraints.within_percent_of_ideal_population(
+    initial_partition, population_tolerance, pop_key="populaton"
+)
 
 # Create a Markov chain
+print(f"{bcolors.OKCYAN}🔗 Creating a Markov chain...{bcolors.ENDC}")
 chain = MarkovChain(
     proposal=proposal,
     constraints=[
@@ -79,55 +102,38 @@ chain = MarkovChain(
     ],
     accept=accept.always_accept,
     initial_state=initial_partition,
-    total_steps=3000,
+    total_steps=10_000,
 )
 
-print("Start running the chain")
-
+print(f"{bcolors.WARNING}\n🚨 Running the chain...{bcolors.ENDC}")
 # Run the chain
-for partition in chain:
+for partition in tqdm(chain):
     cutedge_ensemble.append(len(partition["cut_edges"]))
     population_ensemble.append(sorted(partition["populaton"].values()))
-    
+
+    districts_won_by_democrat_in_pres16.append(partition["dem_won_pres"].wins("Dem"))
+    districts_won_by_democrat_in_sen16.append(partition["dem_won_sen"].wins("Dem"))
+
     num_white = 0
-    num_hisp = 0
     num_black = 0
-    num_asian = 0
-    num_native = 0
 
     for i in range(1, num_districts + 1):
         w_prec = partition["white"][i]
-        h_prec = partition["hisp"][i]
         b_prec = partition["black"][i]
-        a_prec = partition["asian"][i]
-        n_prec = partition["native"][i]
 
         # find the max population and increment the corresponding counter
-        max_prec = max(w_prec, h_prec, b_prec, a_prec, n_prec)
+        max_prec = max(w_prec, b_prec)
         if max_prec == w_prec:
             num_white += 1
-        elif max_prec == h_prec:
-            num_hisp += 1
         elif max_prec == b_prec:
             num_black += 1
-        elif max_prec == a_prec:
-            num_asian += 1
-        elif max_prec == n_prec:
-            num_native += 1
 
-    maj_hisp_ensemble.append(num_hisp)
     maj_black_ensemble.append(num_black)
-    maj_asian_ensemble.append(num_asian)
-    maj_native_ensemble.append(num_native)
     maj_white_ensemble.append(num_white)
 
 
-
-
 ## draw histogram of the above ensemble
-import matplotlib.pyplot as plt
-import numpy as np
-
+print(f"\n{bcolors.OKPINK}🎨 Drawing graph for cut edges{bcolors.ENDC}")
 plt.figure()
 plt.hist(cutedge_ensemble, align="left")
 plt.xlabel("Number of cut edges")
@@ -135,6 +141,7 @@ plt.ylabel("Frequency")
 plt.title("Histogram of the number of cut edges")
 plt.savefig("cut_edges.png")
 
+print(f"{bcolors.OKPINK}🎨 Drawing graph for population{bcolors.ENDC}")
 plt.figure()
 plt.hist(population_ensemble, align="left")
 plt.xlabel("Population")
@@ -142,42 +149,124 @@ plt.ylabel("Frequency")
 plt.title("Histogram of the population")
 plt.savefig("population.png")
 
+print(f"{bcolors.OKPINK}🎨 Drawing graph for Dem presidential wins{bcolors.ENDC}")
+plt.figure()
+plt.hist(districts_won_by_democrat_in_pres16, align="left")
+plt.xlabel("Number of districts won by Democrats in 2016 presidential")
+plt.ylabel("Steps")
+plt.title("Histogram of the number of districts won by Democrats in 2016 presidential")
+plt.savefig("dem_pres16.png")
+
+print(f"{bcolors.OKPINK}🎨 Drawing graph for Rep presidential wins{bcolors.ENDC}")
+plt.figure()
+plt.hist(districts_won_by_democrat_in_sen16, align="left")
+plt.xlabel("Number of districts won by Democrats in 2016 senatorial")
+plt.ylabel("Steps")
+plt.title("Histogram of the number of districts won by Democrats in 2016 senatorial")
+plt.savefig("dem_sen16.png")
+
+print(f"{bcolors.OKPINK}🎨 Drawing graph for majority White VAP{bcolors.ENDC}")
 plt.figure()
 plt.hist(maj_white_ensemble, align="left")
 plt.xlabel("Number of majority White VAP districts")
-plt.ylabel("Frequency")
+plt.ylabel("Steps")
 plt.title("Histogram of the number of majority White VAP districts")
 plt.savefig("maj_white.png")
 
-plt.figure()
-plt.hist(maj_hisp_ensemble, align="left")
-plt.xlabel("Number of majority Hispanic VAP districts")
-plt.ylabel("Frequency")
-plt.title("Histogram of the number of majority Hispanic VAP districts")
-plt.savefig("maj_hisp.png")
-
+print(f"{bcolors.OKPINK}🎨 Drawing graph for majority Black VAP{bcolors.ENDC}")
 plt.figure()
 plt.hist(maj_black_ensemble, align="left")
 plt.xlabel("Number of majority Black VAP districts")
-plt.ylabel("Frequency")
+plt.ylabel("Steps")
 plt.title("Histogram of the number of majority Black VAP districts")
 plt.savefig("maj_black.png")
 
+# -------------------------------------------------------
+# Mean Median and Efficiency Gap analysis
+# -------------------------------------------------------
+mean_median_pres = []
+mean_median_sen = []
+efficiency_gap_pres = []
+efficiency_gap_sen = []
+print(
+    f"\n{bcolors.OKPINK}📊 Generating mean-median analysis for pres and sen elections{bcolors.ENDC}"
+)
 plt.figure()
-plt.hist(maj_asian_ensemble, align="left")
-plt.xlabel("Number of majority Asian VAP districts")
-plt.ylabel("Frequency")
-plt.title("Histogram of the number of majority Asian VAP districts")
-plt.savefig("maj_asian.png")
 
+for partition in chain:
+    mean_median_pres.append(mean_median(partition["dem_won_pres"]))
+    mean_median_sen.append(mean_median(partition["dem_won_sen"]))
+    efficiency_gap_pres.append(efficiency_gap(partition["dem_won_pres"]))
+    efficiency_gap_sen.append(efficiency_gap(partition["dem_won_sen"]))
+plt.plot(mean_median_pres, label="Presidential")
+plt.plot(mean_median_sen, label="Senatorial")
+# mark the 0 line
+plt.axhline(0, color="black", linestyle="--")
+plt.title("Mean-median difference for presidential and senatorial elections")
+plt.xlabel("Steps")
+plt.ylabel("Mean-median difference")
+plt.legend()
+plt.savefig("mean_median.png")
+
+print(
+    f"{bcolors.OKPINK}📊 Generating efficiency gap analysis for pres and sen elections{bcolors.ENDC}"
+)
+plt.figure()
+plt.plot(efficiency_gap_pres, label="Presidential")
+plt.plot(efficiency_gap_sen, label="Senatorial")
+# mark the 0 line
+plt.axhline(0, color="black", linestyle="--")
+plt.title("Efficiency gap for presidential and senatorial elections")
+plt.xlabel("Steps")
+plt.ylabel("Efficiency gap")
+plt.legend()
+plt.savefig("efficiency_gap.png")
+
+
+# -------------------------------------------------------
+# Marginal box plots analysis
+# -------------------------------------------------------
+
+# Marginal box plots for dem won pres16 for each district, x axis is the number of
+# districts and y axis is the % of wins. each district comes from the
+# partition in chain.
+wins_by_district_pres16 = [[] for _ in range(num_districts)]
+wins_by_district_sen16 = [[] for _ in range(num_districts)]
+
+print(
+    f"\n{bcolors.OKPINK}🕯️  Generating marginal box plots for Dem presidential election{bcolors.ENDC}"
+)
 
 plt.figure()
-plt.hist(maj_native_ensemble, align="left")
-plt.xlabel("Number of majority Native VAP districts")
-plt.ylabel("Frequency")
-plt.title("Histogram of the number of majority Native VAP districts")
-plt.savefig("maj_native.png")
+for partition in chain:
+    for i in range(0, num_districts):
+        wins_by_district_pres16[i].append(
+            partition["dem_won_pres"].percent("Dem", i + 1)
+        )
+        wins_by_district_sen16[i].append(partition["dem_won_sen"].percent("Dem", i + 1))
+plt.boxplot(wins_by_district_pres16)
+plt.xlabel("Districts")
+plt.ylabel("% of wins")
+# mark the 50% line
+plt.axhline(0.5, color="black", linestyle="--")
+plt.title("Marginal box plot for Democrats presidential wins in 2016")
+plt.savefig("marginal_pres16.png")
 
+
+# Marginal box plots for dem won sen16
+print(
+    f"{bcolors.OKPINK}🕯️  Generating marginal box plots for Dem senatorial election{bcolors.ENDC}"
+)
+plt.figure()
+plt.boxplot(wins_by_district_sen16)
+plt.xlabel("Districts")
+plt.ylabel("% of wins")
+# mark the 50% line
+plt.axhline(0.5, color="black", linestyle="--")
+plt.title("Marginal box plot for Democrats senatorial wins in 2016")
+plt.savefig("marginal_sen16.png")
 
 end_time = time.time()
-print("The time to import il_pl2020_p2_b.shp is:", (end_time - start_time) / 60, "mins")
+print(
+    f"\n{bcolors.OKGREEN}✅ The time to run the whole analysis is {end_time - start_time} seconds{bcolors.ENDC}"
+)
