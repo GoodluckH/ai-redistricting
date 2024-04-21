@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 from gerrychain.metrics import mean_median, efficiency_gap
 from tqdm import tqdm
 
+NUM_STEPS = 20_000
+
 
 class bcolors:
     HEADER = "\033[95m"
@@ -44,7 +46,6 @@ ideal_population = total_population / num_districts
 population_tolerance = 0.02
 
 
-# TODO: short burst
 cutedge_ensemble = []
 population_ensemble = []
 
@@ -53,6 +54,14 @@ districts_won_by_democrat_in_sen16 = []
 
 maj_white_ensemble = []
 maj_black_ensemble = []
+
+mean_median_pres = []
+mean_median_sen = []
+efficiency_gap_pres = []
+efficiency_gap_sen = []
+
+wins_by_district_pres16 = [[] for _ in range(num_districts)]
+wins_by_district_sen16 = [[] for _ in range(num_districts)]
 
 # Create an initial partition
 print(f"{bcolors.OKCYAN}🏗️  Creating an initial partition...{bcolors.ENDC}")
@@ -102,17 +111,22 @@ chain = MarkovChain(
     ],
     accept=accept.always_accept,
     initial_state=initial_partition,
-    total_steps=10_000,
+    total_steps=NUM_STEPS,
 )
 
 print(f"{bcolors.WARNING}\n🚨 Running the chain...{bcolors.ENDC}")
-# Run the chain
+
 for partition in tqdm(chain):
     cutedge_ensemble.append(len(partition["cut_edges"]))
     population_ensemble.append(sorted(partition["populaton"].values()))
 
     districts_won_by_democrat_in_pres16.append(partition["dem_won_pres"].wins("Dem"))
     districts_won_by_democrat_in_sen16.append(partition["dem_won_sen"].wins("Dem"))
+
+    mean_median_pres.append(mean_median(partition["dem_won_pres"]))
+    mean_median_sen.append(mean_median(partition["dem_won_sen"]))
+    efficiency_gap_pres.append(efficiency_gap(partition["dem_won_pres"]))
+    efficiency_gap_sen.append(efficiency_gap(partition["dem_won_sen"]))
 
     num_white = 0
     num_black = 0
@@ -127,6 +141,10 @@ for partition in tqdm(chain):
             num_white += 1
         elif max_prec == b_prec:
             num_black += 1
+        wins_by_district_pres16[i - 1].append(
+            partition["dem_won_pres"].percent("Dem", i)
+        )
+        wins_by_district_sen16[i - 1].append(partition["dem_won_sen"].percent("Dem", i))
 
     maj_black_ensemble.append(num_black)
     maj_white_ensemble.append(num_white)
@@ -184,20 +202,11 @@ plt.savefig("maj_black.png")
 # -------------------------------------------------------
 # Mean Median and Efficiency Gap analysis
 # -------------------------------------------------------
-mean_median_pres = []
-mean_median_sen = []
-efficiency_gap_pres = []
-efficiency_gap_sen = []
+
 print(
     f"\n{bcolors.OKPINK}📊 Generating mean-median analysis for pres and sen elections{bcolors.ENDC}"
 )
 plt.figure()
-
-for partition in chain:
-    mean_median_pres.append(mean_median(partition["dem_won_pres"]))
-    mean_median_sen.append(mean_median(partition["dem_won_sen"]))
-    efficiency_gap_pres.append(efficiency_gap(partition["dem_won_pres"]))
-    efficiency_gap_sen.append(efficiency_gap(partition["dem_won_sen"]))
 plt.plot(mean_median_pres, label="Presidential")
 plt.plot(mean_median_sen, label="Senatorial")
 # mark the 0 line
@@ -230,20 +239,12 @@ plt.savefig("efficiency_gap.png")
 # Marginal box plots for dem won pres16 for each district, x axis is the number of
 # districts and y axis is the % of wins. each district comes from the
 # partition in chain.
-wins_by_district_pres16 = [[] for _ in range(num_districts)]
-wins_by_district_sen16 = [[] for _ in range(num_districts)]
 
 print(
     f"\n{bcolors.OKPINK}🕯️  Generating marginal box plots for Dem presidential election{bcolors.ENDC}"
 )
 
 plt.figure()
-for partition in chain:
-    for i in range(0, num_districts):
-        wins_by_district_pres16[i].append(
-            partition["dem_won_pres"].percent("Dem", i + 1)
-        )
-        wins_by_district_sen16[i].append(partition["dem_won_sen"].percent("Dem", i + 1))
 plt.boxplot(wins_by_district_pres16)
 plt.xlabel("Districts")
 plt.ylabel("% of wins")
