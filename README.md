@@ -1,9 +1,11 @@
-![Ohio Project Logo](https://raw.githubusercontent.com/GoodluckH/ai-redistricting/668ee05c483495fefd754643eb7f96d2914f1754/assets/logo.svg)
+<p align="center">
+  <img width="400" src="https://raw.githubusercontent.com/GoodluckH/ai-redistricting/668ee05c483495fefd754643eb7f96d2914f1754/assets/logo.svg">
+</p>
 
 ---
 
 <p align="center">
-  <i>In-depth political geometry analysis of Ohio</i>
+  <i>Political geometry analysis of Ohio</i>
 </p>
 
 <p align="center">
@@ -42,7 +44,8 @@ ai-redistricting/
 ├── src/                    # Source code
 │   ├── main.py             # Main script for running the analysis
 │   ├── Ohio_MAUP.ipynb     # Notebook used to produce shapefiles
-...
+│   └── gingleator.py       # Gingleator helper for SB analysis
+└──...
 ```
 
 ### 🚀 Quick Start
@@ -60,7 +63,8 @@ file to point to the correct location of the data files.
 
 ### 📈 Analysis
 
-Make sure you ahve the required libraries installed:
+Make sure you have the required libraries installed, then run the
+following command:
 
 ```bash
 cd src
