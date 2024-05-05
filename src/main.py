@@ -16,22 +16,9 @@ from gerrychain.metrics import mean_median, efficiency_gap
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+from utils import bcolors
 
 NUM_STEPS = 20_000
-
-
-class bcolors:
-    HEADER = "\033[95m"
-    OKBLUE = "\033[94m"
-    OKCYAN = "\033[96m"
-    OKPINK = "\u001b[38;5;201m"
-    OKGREEN = "\033[92m"
-    WARNING = "\033[93m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
-
 
 # Load the data
 print(f"{bcolors.OKCYAN}🚚 Loading the data...{bcolors.ENDC}")

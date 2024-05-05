@@ -39,11 +39,13 @@ The repository is organized as follows:
 ```bash
 ai-redistricting/
 ├── assets/                 # Misc. assets
-├── data/                   # Data files - shapefiles
+├── data/                   # Data files - shapefiles and short burst files
 ├── output/                 # Output images
 ├── src/                    # Source code
 │   ├── main.py             # Main script for running the analysis
 │   ├── Ohio_MAUP.ipynb     # Notebook used to produce shapefiles
+│   ├── Ohio_SB.ipynb       # Notebook used to analyze short bursts
+│   ├── sb.py               # Script for producing short bursts data
 │   └── gingleator.py       # Gingleator helper for SB analysis
 └──...
 ```
@@ -70,8 +72,16 @@ following command:
 cd src
 python3 main.py
 ```
-
 Output images will be saved in the `output/` directory.
+
+
+To run the short burst analysis:
+
+```bash
+cd src
+python3 sb.py
+```
+Output data files will be saved in the `data/` directory.
 
 ## 📝 License
 
