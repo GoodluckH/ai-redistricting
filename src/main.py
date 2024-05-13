@@ -25,15 +25,17 @@ print(f"{bcolors.OKCYAN}🚚 Loading the data...{bcolors.ENDC}")
 start_time = time.time()
 ohio = gpd.read_file("../data/Ohio.shp")
 
+# Create a graph from the geographic data
 oh_graph = Graph.from_geodataframe(ohio)
 
-
+# Define the number of districts and calculate ideal population
 num_districts = 15
 total_population = sum([oh_graph.nodes()[v]["TOTPOP"] for v in oh_graph.nodes()])
 ideal_population = total_population / num_districts
 population_tolerance = 0.02
 
 
+# Lists to store data for analysis
 cutedge_ensemble = []
 
 districts_won_by_democrat_in_pres16 = []
@@ -98,6 +100,7 @@ chain = MarkovChain(
 
 print(f"{bcolors.WARNING}\n🚨 Running the chain...{bcolors.ENDC}")
 
+# Run the Markov chain and collect data for analysis
 for partition in tqdm(chain):
     cutedge_ensemble.append(len(partition["cut_edges"]))
 
