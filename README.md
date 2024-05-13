@@ -15,10 +15,6 @@
   <a href="https://github.com/goodluckh/ai-redistricting/issues"><img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/goodluckh/ai-redistricting?style=flat-square"/></a>
 </p>
 
-<p align="center">
-  <a href="https://mochiday.co/">White Paper</a>
-</p>
-
 ## 👻 About
 
 The Ohio redistricting project is a comprehensive analysis of the
@@ -72,8 +68,8 @@ following command:
 cd src
 python3 main.py
 ```
-Output images will be saved in the `output/` directory.
 
+Output images will be saved in the `output/` directory.
 
 To run the short burst analysis:
 
@@ -81,6 +77,7 @@ To run the short burst analysis:
 cd src
 python3 sb.py
 ```
+
 Output data files will be saved in the `data/` directory.
 
 ## 📝 License
